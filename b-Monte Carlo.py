@@ -1,3 +1,4 @@
+# Task b
 import numpy as np
 
 def monte_carlo_option_pricing(S0, K, T, r, sigma, n_sim=100000):
@@ -36,4 +37,5 @@ S0, K, T, r, sigma = 100, 100, 1, 0.05, 0.2
 call, put = monte_carlo_option_pricing(S0, K, T, r, sigma)
 
 print(f"European Call Price (MC): {call:.4f}")
+
 print(f"European Put Price (MC):  {put:.4f}")

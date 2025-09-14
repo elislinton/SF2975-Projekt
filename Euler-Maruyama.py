@@ -1,3 +1,4 @@
+#Task a)
 #GBM using Euler-Maruyama
 import numpy as np
 import matplotlib.pyplot as plt
@@ -36,4 +37,5 @@ plt.title("Geometric Brownian Motion (Euler–Maruyama)")
 plt.xlabel("Time (years)")
 plt.ylabel("Stock Price")
 plt.grid(True)
+
 plt.show()

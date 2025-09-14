@@ -1,4 +1,4 @@
-# Task b)
+# Task g)
 # Least-Squares Monte Carlo (Longstaff-Schwartz) for American put option pricing
 # The code will simulate paths under risk-neutral GBM, then use least-squares regression
 # on in-the-money paths to estimate continuation values and decide early exercise.
@@ -108,5 +108,6 @@ price, stderr = lsm_american_put_price(S0, K, T, r, sigma, n_sim=n_sim, n_steps=
 european_put = black_scholes_put(S0, K, T, r, sigma)
 
 print(price, stderr, european_put)
+
 
 

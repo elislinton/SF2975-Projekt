@@ -2,6 +2,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+from b_Monte_Carlo import monte_carlo_option_pricing
+
 
 # --- Normal CDF using error function ---
 def norm_cdf(x):
@@ -32,11 +34,12 @@ S0, K, T, r = 100, 100, 1.0, 0.05
 
 # --- Vary volatility ---
 vols = np.linspace(0.01, 1.0, 100)
-call_prices = [bs_call_price(S0, K, T, r, sigma) for sigma in vols]
+call_prices_bs = [bs_call_price(S0, K, T, r, sigma) for sigma in vols]
+call_prices_monte_carlo= [monte_carlo_option_pricing(S0, K, T, r, sigma)[0] for sigma in vols]
 
 # --- Plot Call price vs Volatility ---
-plt.figure(figsize=(8,5))
-plt.plot(vols, call_prices, label="Call Price")
+plt.plot(vols, call_prices_monte_carlo, label="Call Price (Monte Carlo)")
+plt.plot(vols, call_prices_bs, label = "Call price (Black Scholes)")
 plt.xlabel("Volatility (sigma)")
 plt.ylabel("Call Price")
 plt.title("European Call Price as a function of Volatility")

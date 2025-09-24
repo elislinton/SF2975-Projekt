@@ -33,7 +33,7 @@ def implied_volatility_call(price, S0, K, T, r, tol=1e-6, max_iter=100):
 S0, K, T, r = 100, 100, 1.0, 0.05
 
 # --- Vary volatility ---
-vols = np.linspace(0.01, 1.0, 100)
+vols = np.linspace(0.01, 5.0, 100)
 call_prices_bs = [bs_call_price(S0, K, T, r, sigma) for sigma in vols]
 call_prices_monte_carlo= [monte_carlo_option_pricing(S0, K, T, r, sigma)[0] for sigma in vols]
 

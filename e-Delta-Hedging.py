@@ -10,7 +10,7 @@ mu, sigma, r, q     = 0.1, 0.2, 0.05, 0 # fördelningsparametrar, utdelning q an
 S_0, K,  W          = 100, 100, 0.0
 T                   = 1
 interval            = [0, T]
-frequencies         = list(range(1,51))              # frekvenser Eför ombalanser, e.g. 1 ombalanserar varje tidssteg, 5 ombalanserar var femte tidssteg
+frequencies         = list(range(1,51))   # frekvenser för ombalanser, e.g. 1 ombalanserar varje tidssteg, 5 ombalanserar var femte tidssteg
 
 # Funktion för att beräkna call pris med BS
 def bs_call_price(t, S_t):
@@ -37,15 +37,14 @@ for n in n_points:
         payoff_C = np.maximum(S_T - K, 0.0)
 
         for freq in frequencies:
-            # --- delta-hedge med UNDERLIGGANDE, självfinansierad ---
-            # start: optionens pris och delta vid t0 på varje path
-            Delta = delta_call(0.0, path[0, :])                 # (n_paths,)
-            V0    = bs_call_price(0.0, path[0, :])              # (n_paths,)
+            # Vid t=0
+            Delta = delta_call(0.0, path[0, :])
+            V0    = bs_call_price(0.0, path[0, :])
             B     = V0 - Delta * path[0]                        # vi håller Delta aktier -> kassakonto som resten
 
-            # rebalansera varje steg med vänsterpunkts-delta
+            # rebalansera varje steg
             for k in range(1, n-1):
-                B *= np.exp(r * dt)                           # väx kontant
+                B *= np.exp(r * dt)   # väx kontant
                 if k%freq == 0:
                     D_new = delta_call(t_axis[k], path[k])        # ny delta vid t_k
                     B -= (D_new - Delta) * path[k]                # köp/sälj aktier; självfinansierat
@@ -72,4 +71,5 @@ plt.ylabel("Standard deviation")
 plt.tight_layout()
 plt.legend()
 plt.show()
+
 

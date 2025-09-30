@@ -5,7 +5,7 @@ from scipy import stats
 from scipy.stats import norm
 
 
-n_paths, n_points   = 5, [1000]     # antal paths per körning samt antal punkter, kan ta flera samtidigt för jämförelse
+n_paths, n_points   = 5, [1000]     # antal paths per körning samt antal punkter
 mu, sigma, r, q     = 0.1, 0.2, 0.05, 0 # fördelningsparametrar, utdelning q antas 0
 S_0, K,  W          = 100, 100, 0.0
 T                   = 1
@@ -71,5 +71,6 @@ plt.ylabel("Standard deviation")
 plt.tight_layout()
 plt.legend()
 plt.show()
+
 
 

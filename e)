@@ -1,0 +1,178 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from math import log, sqrt, exp
+from scipy.stats import norm
+import pandas as pd
+
+# ---------------- Parameters ----------------
+S0 = 100.0     # initial stock price
+K = 100.0      # strike
+r = 0.05       # risk-free rate
+q = 0
+mu = 0.10 # dividend yield
+sigma = 0.20   # volatility
+T = 1.0        # time to maturity (years)
+N = 252        # daily steps per path
+dt = T / N
+n_paths = 1000 # Monte Carlo sample size
+
+np.random.seed(42)  # reproducibility
+
+# ---------------- Black-Scholes formulas ----------------
+def bs_call_price(S, K, r, q, sigma, tau):
+    if tau <= 0:
+        return max(S - K, 0.0)
+    d1 = (log(S / K) + (r - q + 0.5 * sigma**2) * tau) / (sigma * sqrt(tau))
+    d2 = d1 - sigma * sqrt(tau)
+    return exp(-q * tau) * S * norm.cdf(d1) - exp(-r * tau) * K * norm.cdf(d2)
+
+def bs_call_delta(S, K, r, q, sigma, tau):
+    if tau <= 0:
+        return 1.0 if S > K else 0.0
+    d1 = (log(S / K) + (r - q + 0.5 * sigma**2) * tau) / (sigma * sqrt(tau))
+    return exp(-q * tau) * norm.cdf(d1)
+
+def finite_diff_delta(S, K, r, q, sigma, tau, h_rel=1e-4):
+    if S <= 0:
+        return 0.0
+    h = max(1e-8, S * h_rel)
+    up = bs_call_price(S + h, K, r, q, sigma, tau)
+    dn = bs_call_price(S - h, K, r, q, sigma, tau)
+    return (up - dn) / (2.0 * h)
+
+# ---------------- Delta comparison at t=0 ----------------
+delta_bs = bs_call_delta(S0, K, r, q, sigma, T)
+delta_fd = finite_diff_delta(S0, K, r, q, sigma, T)
+print(f"Delta at t=0:")
+print(f" Black–Scholes formula:   {delta_bs:.12f}")
+print(f" Numerical (finite diff): {delta_fd:.12f}")
+print()
+
+# ---------------- Simulate GBM stock paths ----------------
+S = np.zeros((N+1, n_paths))
+S[0, :] = S0
+for t in range(1, N+1):
+    Z = np.random.normal(size=n_paths)
+    S[t, :] = S[t-1, :] * np.exp((mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * Z)
+
+# ---------------- Hedging function ----------------
+def hedge_path(S_path, method='bs', rebalance_steps=252):
+    """
+    Short one call at t=0, delta-hedge discretely, return hedging error:
+    (replicating portfolio) - (option payoff).
+    method: 'bs' = Black-Scholes delta, 'fd' = finite-difference delta
+    """
+    N_total = len(S_path) - 1
+    dt_day = T / N_total
+
+    # rebalancing grid
+    rb_indices = np.linspace(0, N_total, rebalance_steps, endpoint=False).astype(int).tolist()
+    rb_indices = sorted(set(rb_indices))
+    trade_indices = [i for i in rb_indices[1:] if i < N_total]
+
+    # initial hedge at t=0
+    tau0 = T
+    S_t0 = S_path[0]
+    option0 = bs_call_price(S_t0, K, r, q, sigma, tau0)
+    if method == 'bs':
+        delta = bs_call_delta(S_t0, K, r, q, sigma, tau0)
+    else:
+        delta = finite_diff_delta(S_t0, K, r, q, sigma, tau0)
+
+    shares = delta
+    cash = option0 - shares * S_t0  # sell option, buy delta shares
+
+    prev_i = 0
+    for i in trade_indices:
+        # accrue cash interest
+        dt_elapsed = (i - prev_i) * dt_day
+        if dt_elapsed > 0:
+            cash *= np.exp(r * dt_elapsed)
+
+        # new delta
+        tau = max(0.0, T - i * dt_day)
+        S_i = S_path[i]
+        if method == 'bs':
+            new_delta = bs_call_delta(S_i, K, r, q, sigma, tau)
+        else:
+            new_delta = finite_diff_delta(S_i, K, r, q, sigma, tau)
+
+        trade = new_delta - shares
+        cash -= trade * S_i
+        shares = new_delta
+        prev_i = i
+
+    # final cash accrual
+    dt_elapsed = (N_total - prev_i) * dt_day
+    if dt_elapsed > 0:
+        cash *= np.exp(r * dt_elapsed)
+
+    # payoff and hedging error
+    S_T = S_path[-1]
+    payoff = max(S_T - K, 0.0)
+    portfolio_T = shares * S_T + cash
+    return portfolio_T - payoff
+
+# ---------------- Run hedging across different frequencies ----------------
+freqs = [12, 52, 252]
+errors_by_freq = {}
+
+for freq in freqs:
+    errs = np.zeros(n_paths)
+    for i in range(n_paths):
+        errs[i] = hedge_path(S[:, i], method='bs', rebalance_steps=freq)
+    errors_by_freq[freq] = errs
+
+# ---------------- Show statistics ----------------
+def rmse(x): return np.sqrt(np.mean(x**2))
+
+stats = []
+for freq in freqs:
+    errs = errors_by_freq[freq]
+    stats.append({
+        'Frequency': freq,
+        'Mean': errs.mean(),
+        'Std': errs.std(ddof=1),
+        'RMSE': rmse(errs),
+        'N_paths': len(errs)
+    })
+
+df_stats = pd.DataFrame(stats)
+print("\nHedging error statistics:\n")
+print(df_stats.to_string(index=False))
+
+# ---------------- Plot histogram for daily hedging ----------------
+chosen_freq = 252
+for freq in freqs:
+    errs = errors_by_freq[freq]
+    plt.figure(figsize=(8,5))
+    plt.hist(errs, bins=60)
+    plt.margins(x=0.5)
+    plt.axvline(0.0, color='red', linestyle='--')
+    plt.axvline(errs.mean(), color='green', linestyle='--')
+    plt.title(f"Hedging error histogram — rebalancing {freq} times/year")
+    plt.xlabel("Hedging error (portfolio − payoff)")
+    plt.ylabel("Frequency")
+    plt.tight_layout()
+    plt.show()
+
+# ---------------- Plot sample paths with rebalancing markers ----------------
+paths_to_show = [0, 1, 2]
+t = np.linspace(0.0, T, N+1)
+
+rb_idx = np.linspace(0, N, chosen_freq, endpoint=False).astype(int).tolist()
+rb_idx = sorted(set(rb_idx))
+
+plt.figure(figsize=(8,5))
+for i in paths_to_show:
+    plt.plot(t, S[:, i], marker='', markevery=rb_idx)
+plt.title(f"Sample stock paths (markers at rebalancing times) — {chosen_freq} times/year")
+plt.xlabel("Time (years)")
+plt.ylabel("Stock price")
+plt.tight_layout()
+plt.show()
+
+# ---------------- Compare BS delta vs FD delta ----------------
+delta_bs = bs_call_delta(S0, K, r, q, sigma, T)
+delta_fd = finite_diff_delta(S0, K, r, q, sigma, T)
+print(f"\nDelta check at t=0: BS delta = {delta_bs:.6f}, FD delta = {delta_fd:.6f}")
